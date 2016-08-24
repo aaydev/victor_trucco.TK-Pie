@@ -1,1 +1,1 @@
-A baremetal OS to integrate Raspberry Pi with ZX Spectrum Next and other SPectrum clones.
+A baremetal OS to integrate Raspberry Pi with ZX Spectrum Next and other Spectrum clones.
