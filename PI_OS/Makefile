@@ -33,11 +33,6 @@ kernel.img : loader vectors.o periph.o video01.o
 	$(ARMGNU)-objcopy video01.elf -O ihex video01.hex
 	$(ARMGNU)-objcopy video01.elf -O binary kernel.img
 
-
-
-
-
-
 LOPS = -Wall -m32 -emit-llvm
 LLCOPS0 = -march=arm 
 LLCOPS1 = -march=arm -mcpu=arm1176jzf-s
@@ -56,8 +51,6 @@ periph.bc : periph.c
 video01.clang.elf : loader vectors.o video01.bc periph.bc
 	llvm-link periph.bc video01.bc -o video01.nopt.bc
 	opt $(OOPS) video01.nopt.bc -o video01.opt.bc
-	#llc $(LLCOPS) video01.opt.bc -o video01.clang.s
-	#$(ARMGNU)-as video01.clang.s -o video01.clang.o
 	llc $(LLCOPS) -filetype=obj video01.opt.bc -o video01.clang.o
 	$(ARMGNU)-ld -o video01.clang.elf -T loader vectors.o video01.clang.o
 	$(ARMGNU)-objdump -D video01.clang.elf > video01.clang.list

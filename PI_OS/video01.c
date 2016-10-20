@@ -1,3 +1,39 @@
+//
+// TK-PIE
+// Copyright (c) 2016 - Fabio Belavenuto & Victor Trucco
+//
+// All rights reserved
+//
+// Redistribution and use in source and synthezised forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// Redistributions of source code must retain the above copyright notice,
+// this list of conditions and the following disclaimer.
+//
+// Redistributions in synthesized form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// Neither the name of the author nor the names of other contributors may
+// be used to endorse or promote products derived from this software without
+// specific prior written permission.
+//
+// THIS CODE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+//
+// You are responsible for any legal issues arising from your use of this code.
+//
+//-------------------------------------------------------------------------------
+
 #define ARMBASE 0x8000
 #define CS 0x20003000
 #define CLO 0x20003004
@@ -20,13 +56,13 @@
 
 // GPIO -----------------
 
-#define GPFSEL0 0x20200000 // função de GPIO 0 a 9
-#define GPFSEL1 0x20200004 // função de GPIO 10 a 19
-#define GPFSEL2 0x20200008 // função de GPIO 20 a 29
-#define GPFSEL3 0x2020000C // função de GPIO 30 a 39
-#define GPSET0  0x2020001C //set bits
-#define GPCLR0  0x20200028 //clear bits
-#define GPLEV0  0x20200034 // le GPIO 0...31     , GPLEV1 has the values for pins 32->53.
+#define GPFSEL0 0x20200000 // GPIO 0 a 9
+#define GPFSEL1 0x20200004 // GPIO 10 a 19
+#define GPFSEL2 0x20200008 // GPIO 20 a 29
+#define GPFSEL3 0x2020000C // GPIO 30 a 39
+#define GPSET0  0x2020001C // set bits
+#define GPCLR0  0x20200028 // clear bits
+#define GPLEV0  0x20200034 // GPIO 0...31     , GPLEV1 has the values for pins 32->53.
 #define GPEDS0 	0x20200040 // GPIO Pin Event Detect Status 0 
 #define GPFEN0 	0x20200058 // GPIO 0..31 Pin Falling Edge Detect Enable 0 (setar 1 no bit para detectar)
 #define GPAFEN0 0x20200088 // GPIO 0..31 Pin Async. Falling Edge Detect 0 (setar 1 no bit para detectar)
@@ -35,6 +71,7 @@
 #define GPPUDCLK0 	0x20200098 //GPIO Pin Pull-up/down Enable Clock 0 
 
 // IRQ -------------- 
+
 #define IRQ_PENDING2    0x2000B208
 #define IRQ_ENABLE2     0x2000B214
 #define IRQ_FIQ_CTRL    0x2000B20C
@@ -44,7 +81,7 @@
 unsigned int *ptr_GPEDS0 = (unsigned int *)GPEDS0;
 unsigned int *ptr_GPLEV0 = (unsigned int *)GPLEV0;
 
-unsigned char tela1[10000];
+unsigned char scr1[10000];
 
 unsigned int line_num=0;
  
@@ -105,12 +142,11 @@ typedef struct GPIO_bits_
 	unsigned int ADDR  : 13;
 
 	unsigned char A15_13  : 3;
-
-	              
-	unsigned char MREQ : 1; //GPIO 24
-    unsigned char IOREQ : 1; //GPIO 25
-    unsigned char RD : 1;
-    unsigned char WR : 1;
+              
+	unsigned char fiqData 			: 1; //GPIO 24
+    unsigned char fiqBorder 		: 1; //GPIO 25
+    unsigned char fiqULAplus_addr  	: 1; //GPIO 26
+    unsigned char fiqULAplus_data 	: 1; //GPIO 27
     unsigned char GP28 : 1;
     unsigned char GP29 : 1;
     unsigned char GP30 : 1;
@@ -243,7 +279,7 @@ void draw_ULA( unsigned int dy )
 	
 	for ( i = 0; i < 32; i++ )
 	{	
-		pAttr.value = tela1[ attr ];
+		pAttr.value = scr1[ attr ];
 		
 		if(pAttr.b.flash && (flash_state&1)!=1)
 		{
@@ -259,17 +295,17 @@ void draw_ULA( unsigned int dy )
 		//ink = ulaplus_palette_table[(pAttr.b.flash * 2 + pAttr.b.bright) * 16 + pAttr.b.ink ];
 		//paper = ulaplus_palette_table[(pAttr.b.flash * 2 + pAttr.b.bright) * 16 + pAttr.b.paper + 8 ];		
 
-		PUT32( fb_pos,  ((( tela1[ addr ] & 16  ) > 0 )  ? ink << 24 : paper << 24 ) | 
-						((( tela1[ addr ] & 32  ) > 0 )  ? ink << 16 : paper << 16 ) | 
-						((( tela1[ addr ] & 64  ) > 0 )  ? ink << 8  : paper << 8  ) |
-						((( tela1[ addr ] & 128 ) > 0 )  ? ink       : paper       ));
+		PUT32( fb_pos,  ((( scr1[ addr ] & 16  ) > 0 )  ? ink << 24 : paper << 24 ) | 
+						((( scr1[ addr ] & 32  ) > 0 )  ? ink << 16 : paper << 16 ) | 
+						((( scr1[ addr ] & 64  ) > 0 )  ? ink << 8  : paper << 8  ) |
+						((( scr1[ addr ] & 128 ) > 0 )  ? ink       : paper       ));
 		
 		fb_pos += 4;
 		
-		PUT32( fb_pos,  ((( tela1[ addr ] & 1 ) > 0 ) ? ink << 24 : paper << 24 ) | 
-						((( tela1[ addr ] & 2 ) > 0 ) ? ink << 16 : paper << 16 ) | 
-						((( tela1[ addr ] & 4 ) > 0 ) ? ink << 8  : paper << 8  ) |
-						((( tela1[ addr ] & 8 ) > 0 ) ? ink 	  : paper       ));
+		PUT32( fb_pos,  ((( scr1[ addr ] & 1 ) > 0 ) ? ink << 24 : paper << 24 ) | 
+						((( scr1[ addr ] & 2 ) > 0 ) ? ink << 16 : paper << 16 ) | 
+						((( scr1[ addr ] & 4 ) > 0 ) ? ink << 8  : paper << 8  ) |
+						((( scr1[ addr ] & 8 ) > 0 ) ? ink 	  : paper       ));
 		
 		fb_pos += 4;
 		
@@ -298,7 +334,7 @@ void draw_ULAplus( unsigned int dy )
 	
 	for ( i = 0; i < 32; i++ )
 	{	
-		pAttr.value = tela1[ attr ];
+		pAttr.value = scr1[ attr ];
 		
 		//ink   = pAttr.b.bright << 3 | pAttr.b.ink;
 		//paper = pAttr.b.bright << 3 | pAttr.b.paper;	
@@ -306,17 +342,17 @@ void draw_ULAplus( unsigned int dy )
 		ink   = ulaplus_palette_table[(pAttr.b.flash * 2 + pAttr.b.bright) * 16 + pAttr.b.ink ];
 		paper = ulaplus_palette_table[(pAttr.b.flash * 2 + pAttr.b.bright) * 16 + pAttr.b.paper + 8 ];		
 
-		PUT32( fb_pos,  ((( tela1[ addr ] & 16  ) > 0 )  ? ink << 24 : paper << 24 ) | 
-						((( tela1[ addr ] & 32  ) > 0 )  ? ink << 16 : paper << 16 ) | 
-						((( tela1[ addr ] & 64  ) > 0 )  ? ink << 8  : paper << 8  ) |
-						((( tela1[ addr ] & 128 ) > 0 )  ? ink       : paper       ));
+		PUT32( fb_pos,  ((( scr1[ addr ] & 16  ) > 0 )  ? ink << 24 : paper << 24 ) | 
+						((( scr1[ addr ] & 32  ) > 0 )  ? ink << 16 : paper << 16 ) | 
+						((( scr1[ addr ] & 64  ) > 0 )  ? ink << 8  : paper << 8  ) |
+						((( scr1[ addr ] & 128 ) > 0 )  ? ink       : paper       ));
 		
 		fb_pos += 4;
 		
-		PUT32( fb_pos,  ((( tela1[ addr ] & 1 ) > 0 ) ? ink << 24 : paper << 24 ) | 
-						((( tela1[ addr ] & 2 ) > 0 ) ? ink << 16 : paper << 16 ) | 
-						((( tela1[ addr ] & 4 ) > 0 ) ? ink << 8  : paper << 8  ) |
-						((( tela1[ addr ] & 8 ) > 0 ) ? ink 	  : paper       ));
+		PUT32( fb_pos,  ((( scr1[ addr ] & 1 ) > 0 ) ? ink << 24 : paper << 24 ) | 
+						((( scr1[ addr ] & 2 ) > 0 ) ? ink << 16 : paper << 16 ) | 
+						((( scr1[ addr ] & 4 ) > 0 ) ? ink << 8  : paper << 8  ) |
+						((( scr1[ addr ] & 8 ) > 0 ) ? ink 	  : paper       ));
 		
 		fb_pos += 4;
 		
@@ -335,7 +371,7 @@ void drawAttr(unsigned int addr)
 	
 	packed_attr pAttr;
 		
-	pAttr.value = tela1[addr];
+	pAttr.value = scr1[addr];
 	
 	
 	address = ((addr&0b0001100000000)<<3) | (f<<8) | (addr & 255);
@@ -350,14 +386,14 @@ void drawAttr(unsigned int addr)
 		
 		dx = pVideo.b.x << 3;
 
-		((tela1[address]&128)>0) ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((tela1[address]&64)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((tela1[address]&32)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((tela1[address]&16)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((tela1[address]&8)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((tela1[address]&4)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((tela1[address]&2)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((tela1[address]&1)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((scr1[address]&128)>0) ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((scr1[address]&64)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((scr1[address]&32)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((scr1[address]&16)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((scr1[address]&8)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((scr1[address]&4)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((scr1[address]&2)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((scr1[address]&1)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
 			
 	}
 
@@ -380,10 +416,10 @@ void initVideo ( void )
 	PUT32(0x40040014, SCREEN_WIDTH);//; Value Buffer
 	PUT32(0x40040018, SCREEN_HEIGHT);// ; Value Buffer
 
-	PUT32(0x4004001c, 0x00048004);	//Set_Virtual_Buffer ; Tag Identifier
-	PUT32(0x40040020, 0x00000008);	// ; Value Buffer Size In Bytes
-	PUT32(0x40040024, 0x00000008);  //; 1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
-	PUT32(0x40040028, SCREEN_WIDTH); //; Value Buffer
+	PUT32(0x4004001c, 0x00048004);	  //Set_Virtual_Buffer ; Tag Identifier
+	PUT32(0x40040020, 0x00000008);    // ; Value Buffer Size In Bytes
+	PUT32(0x40040024, 0x00000008);    //; 1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
+	PUT32(0x40040028, SCREEN_WIDTH);  //; Value Buffer
 	PUT32(0x4004002c, SCREEN_HEIGHT); // ; Value Buffer
 
 	PUT32(0x40040030, 0x00048005);	//Set_Depth ; Tag Identifier
@@ -540,7 +576,7 @@ void c_fiq_handler ( void )
 
 	if ( ( ptr_GPEDS0[ 0 ] & 0x2000000 ) != 0 )
 	{
-		//limpa a interrupçao
+		//clear the interrupt
 		ptr_GPEDS0[ 0 ] |= 0x2000000;
 
 		if ( ulaPlus_enable != 1 )
@@ -554,14 +590,14 @@ void c_fiq_handler ( void )
 	}
 	else if ( ( ptr_GPEDS0[ 0 ] & 0x1000000 ) != 0 )
 	{	
-		//limpa a interrupçao
+		//clear the interrupt
 		ptr_GPEDS0[ 0 ] |= 0x1000000;
 		
-		tela1[ pGPIO.b.ADDR ] = pGPIO.b.DATA;	
+		scr1[ pGPIO.b.ADDR ] = pGPIO.b.DATA;	
 	}
 	else if ( ( ptr_GPEDS0[ 0 ] & 0x4000000 ) != 0 ) //BF3B ULAplus addr
 	{
-		//limpa a interrupçao
+		//clear the interrupt
 		ptr_GPEDS0[ 0 ] |= 0x4000000;
 
 		ULAplus_register.value = pGPIO.b.DATA;
@@ -569,7 +605,7 @@ void c_fiq_handler ( void )
 	}
 	else  //FF3B ULAplus data
 	{
-		//limpa a interrupçao
+		//clear the interrupt
 		ptr_GPEDS0[ 0 ] |= 0x8000000;
 
 		ulaplus_data = pGPIO.b.DATA;
@@ -606,7 +642,7 @@ void c_fiq_handler ( void )
 void c_irq_handler ( void )
 {
 	
-	//limpa a interrupçao. 
+	//clear the interrupt. 
     PUT32(ARM_TIMER_CLI,0);
 	
 	flash_counter++;
@@ -614,28 +650,28 @@ void c_irq_handler ( void )
 
 	int x,y;
 	
-	fb_pos = frameBuffer + 7712; //espaço para borda superior e esquerda
+	fb_pos = frameBuffer + 7712; //space for upper and left border
 	 
 	for ( line_num = 0; line_num < 192; line_num++ )
 	{
 
-			ptDraw( line_num ); //desenha uma linha toda
+			ptDraw( line_num ); //draw the line
 
 		unsigned char cor = border_color;
-		for ( x = 0; x < 32; x++ ) //borda direita
+		for ( x = 0; x < 32; x++ ) //right border
 		{
 			PUT8( fb_pos++, cor ); 
 		}
 		
 		
-		for ( x = 0; x < 32; x++ ) //borda esquerda
+		for ( x = 0; x < 32; x++ ) //left border
 		{
 			PUT8( fb_pos++, cor ); 
 		}
 		
 	}
 	
-	for ( y = 0; y < 24; y++ ) //borda inferior
+	for ( y = 0; y < 24; y++ ) //lower border
 	{
 		for ( x = 0; x < SCREEN_WIDTH; x++ )
 		{
@@ -649,12 +685,12 @@ void c_irq_handler ( void )
 	{
 		for ( x = 0; x < SCREEN_WIDTH; x++ )
 		{
-			PUT8( fb_pos++, border_color ); 
+			PUT8( fb_pos++, border_color ); //upper border
 		}
 		
 	}
 	
-	for ( x = 0; x < 32; x++ ) //comecinho da borda esquerda
+	for ( x = 0; x < 32; x++ ) //single line for left border
 	{
 		PUT8( fb_pos++, border_color ); 
 	}
@@ -674,76 +710,61 @@ int notmain ( void )
 	
 	initVideo();
 
-	
-	
-	
-	
-	//-------------- configura os GPIO
+
+	//-------------- config GPIOs
 	
 	PUT32( GPPUD, 0x02 ); // Enable Pull Up control 
 	
 	
-    PUT32( GPFSEL0, 0 ); // GPIO 0 a 9 como entrada
-    PUT32( GPFSEL1, 0 ); // GPIO 10 a 19 como entrada
-	PUT32( GPFSEL2, 0 ); // GPIO 20 a 29 como entrada
+    PUT32( GPFSEL0, 0 ); // GPIO 0 to 9 in
+    PUT32( GPFSEL1, 0 ); // GPIO 10 to 19 in
+	PUT32( GPFSEL2, 0 ); // GPIO 20 to 29 in
 			
-	ra = GET32( GPFSEL3 ); // GPIO 30 a 39
-	ra &= 0xFFFFFFC0; // GPIO 30 e 31 como entrada
+	ra = GET32( GPFSEL3 ); // GPIO 30 to 39
+	ra &= 0xFFFFFFC0;      // GPIO 30 and 31 in
     PUT32( GPFSEL3, ra );
 	
-	
 
-	//PUT32( GPPUDCLK0, 0x3000000 ); //GPIO 24 e 25 pull up
-	//PUT32( GPPUDCLK0, 0x7000000 ); //GPIO 24, 25, 26 pull up
 	PUT32( GPPUDCLK0, 0xF000000 ); //GPIO 24, 25, 26,27 pull up
-	
 
-	//PUT32( GPAFEN0, 0x1000000 ); //GPIO 24 falling edge
-//	PUT32( GPAFEN0, 0x3000000 ); //GPIO 24 e 25 falling edge
-//	PUT32( GPAFEN0, 0x7000000 ); //GPIO 24, 25, 26 falling edge
 	PUT32( GPAFEN0, 0xF000000 ); //GPIO 24, 25, 26, 27 falling edge
 	
-	
 	ra = GET32( GPEDS0 ); 
-//	ra |= 0x3000000; 
-	//ra |= 0x7000000; //GPIO 24, 25, 26 
 	ra |= 0xF000000; //GPIO 24, 25, 26 ,27
-	PUT32( GPEDS0, ra ); // limpa GPIO 
+	PUT32( GPEDS0, ra ); // clear GPIO 
 	
 	//FIQ
-	PUT32( IRQ_FIQ_CTRL, 0xB4 ); //FIQ apontando para gpio_int[3] 
+	PUT32( IRQ_FIQ_CTRL, 0xB4 ); //FIQ to gpio_int[3] 
 	enable_fiq();
 	
 	//IRQ
 	//ra = GET32( IRQ_ENABLE2 ); 
-	//ra |= 1<<20;  //gpio_int[3] ok para o GPIO24
-	//ra |= 1<<19;  //gpio_int[2] nao para o gpio_24
-	//ra |= 1<<18;  //gpio_int[1] nao para o gpio_24
-	//ra |= 1<<17;  //gpio_int[0] ok para o gpio_24
-	//ra |= 1<<17;  //gpio_int[0] ok para o gpio_24
+	//ra |= 1<<20;  //gpio_int[3] ok to GPIO24
+	//ra |= 1<<19;  //gpio_int[2] no to gpio_24
+	//ra |= 1<<18;  //gpio_int[1] no to gpio_24
+	//ra |= 1<<17;  //gpio_int[0] ok to gpio_24
+	//ra |= 1<<17;  //gpio_int[0] ok to gpio_24
 	//PUT32( IRQ_ENABLE2, ra );
 	
 	//enable_irq();
 	//enable_fiq();
 	
 	//irq timer
-	PUT32(ARM_TIMER_CTL,0x003E0000); //timer desabilitado
-    PUT32(ARM_TIMER_LOD,19968-1); //50Hz        1.000.000 / 50 = 20000
-    PUT32(ARM_TIMER_RLD,19968-1); // 50.08Mhz Spectrum!!!
-   // PUT32(ARM_TIMER_LOD,1000000-1); //1 segundo
+	PUT32(ARM_TIMER_CTL,0x003E0000); //timer disable
+    PUT32(ARM_TIMER_LOD,19968-1); 
+    PUT32(ARM_TIMER_RLD,19968-1); 
+   // PUT32(ARM_TIMER_LOD,1000000-1); //1 sec
     //PUT32(ARM_TIMER_RLD,1000000-1); // 
     PUT32(ARM_TIMER_DIV,0x000000F9); // 249   250mhz/(249+1) = 1mhz
     PUT32(ARM_TIMER_CLI,0);
     PUT32(IRQ_ENABLE_BASIC,1);
     icount=0;
-	
-	//while( ( ptr_GPLEV0[0] & 0x8000000 ) == 1 ) {} //espera primeiro hsync
 
     enable_irq();
-    PUT32( ARM_TIMER_CTL, 0x003E00A2 ); //habilita o timer
+    PUT32( ARM_TIMER_CTL, 0x003E00A2 ); //enable timer
     PUT32( ARM_TIMER_CLI, 0 );
 	
-	//-------------- fim configura os GPIO	
+	//-------------- end config GPIO	
 	
 	for (k=6144;k<6912; k++)
 	{
@@ -751,7 +772,7 @@ int notmain ( void )
 	}
 	
 	
-	// loop principal
+	// loop - just wait
 	while(1)
 	{
 		//if ( ( ptr_GPLEV0[0] & 0x8000000) == 0 ) //hsync
