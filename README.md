@@ -38,11 +38,16 @@ and here https://www.youtube.com/watch?v=D5r5TAMLlhw
 
 (sorry, but videos are in portuguese!)
 
+### Change log
+
+002 - 10 Jan 2017 - 128k shadow screen support
+001 - 20 oct 2016 - Initial version
+
 
 -----------------------------------------------------------------------------
 TK-PIE
 
-Copyright (c) 2016 - Victor Trucco
+Copyright (c) 2016-2017 - Victor Trucco
 
 
 All rights reserved

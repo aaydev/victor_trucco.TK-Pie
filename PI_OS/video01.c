@@ -78,12 +78,15 @@
 #define IRQ_ENABLE_BASIC 0x2000B218
 
 
-unsigned int *ptr_GPEDS0 = (unsigned int *)GPEDS0;
-unsigned int *ptr_GPLEV0 = (unsigned int *)GPLEV0;
+unsigned int *ptr_GPEDS0 = ( unsigned int * )GPEDS0;
+unsigned int *ptr_GPLEV0 = ( unsigned int * )GPLEV0;
 
-unsigned char scr1[10000];
+unsigned char screen_default[ 0x4000 ];
+unsigned char screen_shadow [ 0x4000 ];
 
-unsigned int line_num=0;
+unsigned int line_num = 0;
+
+unsigned int shadow_active = 0;
  
 extern void PUT32 ( unsigned int, unsigned int );
 extern void PUT16 ( unsigned int, unsigned int );
@@ -108,11 +111,11 @@ unsigned char flash_state = 0;
 
 typedef struct video_bits_ 
 {
-    unsigned char x : 5;	 
-	unsigned char y2 : 3;
+    unsigned char x 		: 5;	 
+	unsigned char y2 		: 3;
 	unsigned char pixel_row : 3;
-	unsigned char y1 : 2;
-	unsigned char holder : 3;
+	unsigned char y1 		: 2;
+	unsigned char holder 	: 3;
 } video_bits;
 
 typedef union 
@@ -123,10 +126,10 @@ typedef union
 
 typedef struct attr_ 
 {
-    unsigned char ink : 3;	 
-	unsigned char paper : 3;
-	unsigned char bright : 1;
-	unsigned char flash : 1;
+    unsigned char ink 		: 3;	 
+	unsigned char paper 	: 3;
+	unsigned char bright 	: 1;
+	unsigned char flash 	: 1;
 } attr;
 
 typedef union 
@@ -137,20 +140,22 @@ typedef union
 
 typedef struct GPIO_bits_ 
 {
-	unsigned char DATA  : 8;
-                  
-	unsigned int ADDR  : 13;
-
-	unsigned char A15_13  : 3;
+	unsigned char DATA  			: 8;            
+	unsigned int  ADDR  			: 13;
+	
+	unsigned char shadowWrite		: 1; //"1" = shadow memory is ready for read and write
+    unsigned char shadowActive 		: 1; //"1" = Speccy is showing the shadow screen, "0" default scren
+	unsigned char A15 				: 1; //GPIO 23
               
 	unsigned char fiqData 			: 1; //GPIO 24
     unsigned char fiqBorder 		: 1; //GPIO 25
     unsigned char fiqULAplus_addr  	: 1; //GPIO 26
     unsigned char fiqULAplus_data 	: 1; //GPIO 27
-    unsigned char GP28 : 1;
-    unsigned char GP29 : 1;
-    unsigned char GP30 : 1;
-    unsigned char GP31 : 1;
+	
+    unsigned char GP28 				: 1;
+    unsigned char GP29 				: 1;
+    unsigned char GP30 				: 1;
+    unsigned char GP31 				: 1;
 		
 } GPIO_bits;
 
@@ -197,6 +202,7 @@ packed_attr pAttr;
 packed_video pVideo;
 
 unsigned char buffer_video[SCREEN_WIDTH * SCREEN_HEIGHT * 2];
+
 
 
 void (*ptDraw)(unsigned int);
@@ -251,7 +257,6 @@ void put_pixel ( int x, int y, int c )
 {
 
     // calculate the pixel's byte offset inside the buffer
-    // note: x * 2 as every pixel is 2 consecutive bytes
     unsigned int pix_offset = x + y * SCREEN_WIDTH;
 	
 	PUT8( frameBuffer + pix_offset, c ); 
@@ -267,6 +272,7 @@ void draw_ULA( unsigned int dy )
 	unsigned char ink,paper;
 	unsigned int i, attr;
 	unsigned int addr;
+	unsigned char *buffer;
 	
 	pVideo.b.x = 0;//dx>>3;
 	pVideo.b.y2 = ( dy >> 3 ) & 7;
@@ -277,9 +283,18 @@ void draw_ULA( unsigned int dy )
 
 	addr = pVideo.value;
 	
+	if 	( shadow_active == 0 )
+	{
+		buffer = screen_default;
+	}		
+	else
+	{
+		buffer = screen_shadow; 
+	}
+	
 	for ( i = 0; i < 32; i++ )
 	{	
-		pAttr.value = scr1[ attr ];
+		pAttr.value = buffer[ attr ];
 		
 		if(pAttr.b.flash && (flash_state&1)!=1)
 		{
@@ -295,17 +310,17 @@ void draw_ULA( unsigned int dy )
 		//ink = ulaplus_palette_table[(pAttr.b.flash * 2 + pAttr.b.bright) * 16 + pAttr.b.ink ];
 		//paper = ulaplus_palette_table[(pAttr.b.flash * 2 + pAttr.b.bright) * 16 + pAttr.b.paper + 8 ];		
 
-		PUT32( fb_pos,  ((( scr1[ addr ] & 16  ) > 0 )  ? ink << 24 : paper << 24 ) | 
-						((( scr1[ addr ] & 32  ) > 0 )  ? ink << 16 : paper << 16 ) | 
-						((( scr1[ addr ] & 64  ) > 0 )  ? ink << 8  : paper << 8  ) |
-						((( scr1[ addr ] & 128 ) > 0 )  ? ink       : paper       ));
+		PUT32( fb_pos,  ((( buffer[ addr ] & 16  ) > 0 )  ? ink << 24 : paper << 24 ) | 
+						((( buffer[ addr ] & 32  ) > 0 )  ? ink << 16 : paper << 16 ) | 
+						((( buffer[ addr ] & 64  ) > 0 )  ? ink << 8  : paper << 8  ) |
+						((( buffer[ addr ] & 128 ) > 0 )  ? ink       : paper       ));
 		
 		fb_pos += 4;
 		
-		PUT32( fb_pos,  ((( scr1[ addr ] & 1 ) > 0 ) ? ink << 24 : paper << 24 ) | 
-						((( scr1[ addr ] & 2 ) > 0 ) ? ink << 16 : paper << 16 ) | 
-						((( scr1[ addr ] & 4 ) > 0 ) ? ink << 8  : paper << 8  ) |
-						((( scr1[ addr ] & 8 ) > 0 ) ? ink 	  : paper       ));
+		PUT32( fb_pos,  ((( buffer[ addr ] & 1 ) > 0 ) ? ink << 24 : paper << 24 ) | 
+						((( buffer[ addr ] & 2 ) > 0 ) ? ink << 16 : paper << 16 ) | 
+						((( buffer[ addr ] & 4 ) > 0 ) ? ink << 8  : paper << 8  ) |
+						((( buffer[ addr ] & 8 ) > 0 ) ? ink 	  : paper       ));
 		
 		fb_pos += 4;
 		
@@ -322,6 +337,8 @@ void draw_ULAplus( unsigned int dy )
 	unsigned char ink,paper;
 	unsigned int i, attr;
 	unsigned int addr;
+	unsigned char *buffer;
+
 	
 	pVideo.b.x = 0;//dx>>3;
 	pVideo.b.y2 = ( dy >> 3 ) & 7;
@@ -332,9 +349,19 @@ void draw_ULAplus( unsigned int dy )
 
 	addr = pVideo.value;
 	
+	if 	( shadow_active == 0 )
+	{
+		buffer = screen_default;
+	}		
+	else
+	{
+		buffer = screen_shadow; 
+	}
+
+	
 	for ( i = 0; i < 32; i++ )
 	{	
-		pAttr.value = scr1[ attr ];
+		pAttr.value = buffer[ attr ];
 		
 		//ink   = pAttr.b.bright << 3 | pAttr.b.ink;
 		//paper = pAttr.b.bright << 3 | pAttr.b.paper;	
@@ -342,17 +369,17 @@ void draw_ULAplus( unsigned int dy )
 		ink   = ulaplus_palette_table[(pAttr.b.flash * 2 + pAttr.b.bright) * 16 + pAttr.b.ink ];
 		paper = ulaplus_palette_table[(pAttr.b.flash * 2 + pAttr.b.bright) * 16 + pAttr.b.paper + 8 ];		
 
-		PUT32( fb_pos,  ((( scr1[ addr ] & 16  ) > 0 )  ? ink << 24 : paper << 24 ) | 
-						((( scr1[ addr ] & 32  ) > 0 )  ? ink << 16 : paper << 16 ) | 
-						((( scr1[ addr ] & 64  ) > 0 )  ? ink << 8  : paper << 8  ) |
-						((( scr1[ addr ] & 128 ) > 0 )  ? ink       : paper       ));
+		PUT32( fb_pos,  ((( buffer[ addr ] & 16  ) > 0 )  ? ink << 24 : paper << 24 ) | 
+						((( buffer[ addr ] & 32  ) > 0 )  ? ink << 16 : paper << 16 ) | 
+						((( buffer[ addr ] & 64  ) > 0 )  ? ink << 8  : paper << 8  ) |
+						((( buffer[ addr ] & 128 ) > 0 )  ? ink       : paper       ));
 		
 		fb_pos += 4;
 		
-		PUT32( fb_pos,  ((( scr1[ addr ] & 1 ) > 0 ) ? ink << 24 : paper << 24 ) | 
-						((( scr1[ addr ] & 2 ) > 0 ) ? ink << 16 : paper << 16 ) | 
-						((( scr1[ addr ] & 4 ) > 0 ) ? ink << 8  : paper << 8  ) |
-						((( scr1[ addr ] & 8 ) > 0 ) ? ink 	  : paper       ));
+		PUT32( fb_pos,  ((( buffer[ addr ] & 1 ) > 0 ) ? ink << 24 : paper << 24 ) | 
+						((( buffer[ addr ] & 2 ) > 0 ) ? ink << 16 : paper << 16 ) | 
+						((( buffer[ addr ] & 4 ) > 0 ) ? ink << 8  : paper << 8  ) |
+						((( buffer[ addr ] & 8 ) > 0 ) ? ink 	  : paper       ));
 		
 		fb_pos += 4;
 		
@@ -365,18 +392,28 @@ void draw_ULAplus( unsigned int dy )
 
 void drawAttr(unsigned int addr) 
 {
-	int f=0;
+	int f = 0;
 	int dx, dy, line;
 	unsigned int address;
+	unsigned char *buffer;
 	
 	packed_attr pAttr;
+	
+	if 	( shadow_active == 0 )
+	{
+		buffer = screen_default;
+	}		
+	else
+	{
+		buffer = screen_shadow; 
+	}
 		
-	pAttr.value = scr1[addr];
+	pAttr.value = buffer[ addr ];
 	
 	
-	address = ((addr&0b0001100000000)<<3) | (f<<8) | (addr & 255);
+	address = (( addr&0b0001100000000) << 3) | (f << 8) | (addr & 255);
 	pVideo.value = address;
-	line = (pVideo.b.y1<<3) | pVideo.b.y2;		
+	line = (pVideo.b.y1 << 3) | pVideo.b.y2;		
 	dy = (line << 3);
 			
 	for (f=0; f<8; f++)
@@ -386,14 +423,14 @@ void drawAttr(unsigned int addr)
 		
 		dx = pVideo.b.x << 3;
 
-		((scr1[address]&128)>0) ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((scr1[address]&64)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((scr1[address]&32)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((scr1[address]&16)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((scr1[address]&8)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((scr1[address]&4)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((scr1[address]&2)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
-		((scr1[address]&1)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((buffer[address]&128)>0) ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((buffer[address]&64)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((buffer[address]&32)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((buffer[address]&16)>0)  ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((buffer[address]&8)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((buffer[address]&4)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((buffer[address]&2)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
+		((buffer[address]&1)>0)   ? put_pixel(dx++,dy+f,pAttr.b.ink) : put_pixel(dx++,dy+f,pAttr.b.paper);
 			
 	}
 
@@ -547,20 +584,20 @@ void initVideoULAplus ( void )
 		PUT32( addr, (0xFF << 24) | (b8 << 16) | (g8 << 8) | r8 ); addr += 4; 
 	}
 	
-	PUT32(addr, 0x00040001); addr+=4;	//Allocate_Buffer ; Tag Identifier
-	PUT32(addr, 0x00000008); addr+=4;   //Value Buffer Size In Bytes
-	PUT32(addr, 0x00000008); addr+=4;   //1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
+	PUT32( addr, 0x00040001 ); addr+=4;	//Allocate_Buffer ; Tag Identifier
+	PUT32( addr, 0x00000008 ); addr+=4;   //Value Buffer Size In Bytes
+	PUT32( addr, 0x00000008 ); addr+=4;   //1 bit (MSB) Request/Response Indicator (0=Request, 1=Response), 31 bits (LSB) Value Length In Bytes
 
 	addr_frameBuffer = addr;
-	PUT32(addr, 0) ; addr+=4;		//Pointer to Framebuffer
-	PUT32(addr, 0) ; addr+=4;			
+	PUT32( addr, 0 ); addr+=4;		//Pointer to Framebuffer
+	PUT32( addr, 0 ); addr+=4;			
 
-	PUT32(addr, 0) ;				//(End Tag)
+	PUT32( addr, 0 );				//(End Tag)
 
-	MailboxWrite(addr_ini,8);
-	MailboxRead(8);
+	MailboxWrite( addr_ini, 8 );
+	MailboxRead( 8 );
 	
-	frameBuffer = GET32(addr_frameBuffer);
+	frameBuffer = GET32( addr_frameBuffer );
 	
 	//for (i=0;i<64;i++) ulaplus_palette_table[i]=255;
 	
@@ -593,7 +630,16 @@ void c_fiq_handler ( void )
 		//clear the interrupt
 		ptr_GPEDS0[ 0 ] |= 0x1000000;
 		
-		scr1[ pGPIO.b.ADDR ] = pGPIO.b.DATA;	
+		shadow_active = pGPIO.b.shadowActive;
+		
+		if ( pGPIO.b.shadowWrite != 0 && pGPIO.b.A15 == 0 )
+		{
+			screen_shadow[ pGPIO.b.ADDR ] = pGPIO.b.DATA;	
+		}
+		else
+		{
+			screen_default[ pGPIO.b.ADDR ] = pGPIO.b.DATA;	
+		}
 	}
 	else if ( ( ptr_GPEDS0[ 0 ] & 0x4000000 ) != 0 ) //BF3B ULAplus addr
 	{
@@ -614,7 +660,7 @@ void c_fiq_handler ( void )
 		{
 			if ( ulaplus_data == 1 )
 			{
-				if (ulaPlus_enable != 1)
+				if ( ulaPlus_enable != 1 )
 				{
 					initVideoULAplus(); 
 					ulaPlus_enable = 1;
@@ -636,17 +682,17 @@ void c_fiq_handler ( void )
 	}
 }
 
- unsigned int icount=0;
- unsigned int frames=0;
+unsigned int icount = 0;
+unsigned int frames = 0;
 
 void c_irq_handler ( void )
 {
 	
 	//clear the interrupt. 
-    PUT32(ARM_TIMER_CLI,0);
+    PUT32( ARM_TIMER_CLI, 0 );
 	
 	flash_counter++;
-	if (flash_counter%16 == 0) flash_state++;
+	if ( flash_counter%16 == 0 ) flash_state++;
 
 	int x,y;
 	
@@ -655,14 +701,13 @@ void c_irq_handler ( void )
 	for ( line_num = 0; line_num < 192; line_num++ )
 	{
 
-			ptDraw( line_num ); //draw the line
+		ptDraw( line_num ); //draw the line
 
 		unsigned char cor = border_color;
 		for ( x = 0; x < 32; x++ ) //right border
 		{
 			PUT8( fb_pos++, cor ); 
 		}
-		
 		
 		for ( x = 0; x < 32; x++ ) //left border
 		{
@@ -677,17 +722,16 @@ void c_irq_handler ( void )
 		{
 			PUT8( fb_pos++, border_color ); 
 		}
-		
 	}
 
 	fb_pos = frameBuffer;
+	
 	for ( y = SCREEN_HEIGHT - 24; y < SCREEN_HEIGHT; y++ )
 	{
 		for ( x = 0; x < SCREEN_WIDTH; x++ )
 		{
 			PUT8( fb_pos++, border_color ); //upper border
 		}
-		
 	}
 	
 	for ( x = 0; x < 32; x++ ) //single line for left border
@@ -772,13 +816,10 @@ int notmain ( void )
 	}
 	
 	
-	// loop - just wait
+	// infinite loop
 	while(1)
 	{
-		//if ( ( ptr_GPLEV0[0] & 0x8000000) == 0 ) //hsync
-		//{
-		//	c_irq_handler ( );
-		//}
+
 	}
 	
     return(0);

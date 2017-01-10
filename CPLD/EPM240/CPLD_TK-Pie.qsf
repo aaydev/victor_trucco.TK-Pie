@@ -93,7 +93,6 @@ set_location_assignment PIN_92 -to BUS_D[3]
 set_location_assignment PIN_86 -to BUS_D[2]
 set_location_assignment PIN_85 -to BUS_D[1]
 set_location_assignment PIN_84 -to BUS_D[0]
-set_location_assignment PIN_98 -to BUS_IORQ
 set_location_assignment PIN_97 -to BUS_MRQ
 set_location_assignment PIN_41 -to GPIO[20]
 set_location_assignment PIN_42 -to GPIO[19]
@@ -105,9 +104,6 @@ set_location_assignment PIN_81 -to BUS_A[12]
 set_global_assignment -name MAX7000_OPTIMIZATION_TECHNIQUE BALANCED
 set_global_assignment -name SYNTH_TIMING_DRIVEN_SYNTHESIS OFF
 set_location_assignment PIN_40 -to GPIO_26
-set_location_assignment PIN_39 -to GPIO_21
-set_location_assignment PIN_66 -to GPIO_22
-set_location_assignment PIN_67 -to GPIO_23
 set_location_assignment PIN_58 -to GPIO_24
 set_location_assignment PIN_56 -to GPIO_25
 set_location_assignment PIN_68 -to GPIO_27
@@ -118,3 +114,11 @@ set_location_assignment PIN_17 -to BURSTGATE
 set_location_assignment PIN_18 -to M1
 set_location_assignment PIN_62 -to CLK
 set_location_assignment PIN_21 -to CLKCPU_OUT
+set_location_assignment PIN_39 -to GPIO[21]
+set_location_assignment PIN_66 -to GPIO[22]
+set_location_assignment PIN_67 -to GPIO[23]
+set_location_assignment PIN_98 -to BUS_IORQ_i
+set_location_assignment PIN_76 -to BUS_IORQ_COPY_i
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to BUS_IORQ_COPY_i
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to BUS_IORQ_i
+set_global_assignment -name SIGNALTAP_FILE output_files/tkpie.stp
