@@ -25,7 +25,7 @@ To latch and shift the levels to 3.3V any kind of CPLD 5V tolerant can be used. 
 
 You don't need to use the EPM240, ANY CPLD 5V tolerant will do the trick, even Xilinx (XC95 series) and others can be used. The code for the CPLD is a vanilla VHDL without any fancy stuff. You can recompile in any IDE.
 
-I precompiled POFs for EPM7128 and EPM240 (folder CPLD) according the pinout in my schematics (folder schematics). These POFs are compile with Quartus II (QSF to open the project also included).
+I precompiled POFs for EPM7128 and EPM240 (folder CPLD) according the pinout in my schematics (folder schematics). These POFs are compiled with Quartus II (QSF to open the project also included).
 
 ### Gerber data
 The gerber for the board as you see in photos folder is included. Have fun! 
@@ -33,7 +33,9 @@ The gerber for the board as you see in photos folder is included. Have fun!
 ### See in Action
 
 You can find some TK-Pie videos here
+
 https://www.youtube.com/watch?v=1tVO3xKxZTA
+
 and here https://www.youtube.com/watch?v=D5r5TAMLlhw
 
 (sorry, but videos are in portuguese!)
@@ -41,6 +43,7 @@ and here https://www.youtube.com/watch?v=D5r5TAMLlhw
 ### Change log
 
 002 - 10 Jan 2017 - 128k shadow screen support
+
 001 - 20 oct 2016 - Initial version
 
 
